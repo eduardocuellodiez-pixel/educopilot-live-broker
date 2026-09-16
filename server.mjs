@@ -78,4 +78,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  res.writeHead(404, { "Content-Type":
+    res.writeHead(404, {
+    "Content-Type": "text/plain; charset=utf-8"
+  });
+  res.end("Not found");
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`EduCopilot Live Broker escuchando en puerto ${PORT}`);
+});
