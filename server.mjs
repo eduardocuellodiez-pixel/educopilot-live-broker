@@ -123,10 +123,6 @@ const server = http.createServer(async (req, res) => {
 
       const offerSdp = typeof body.offer_sdp === "string" ? body.offer_sdp : "";
       if (!offerSdp.startsWith("v=0")) return json(res, 400, { error: "offer_sdp ausente o invalido", broker_version: PROTOCOL_VERSION });
-      }
-
-      const offerSdp = typeof body.offer_sdp === "string" ? body.offer_sdp : "";
-      if (!offerSdp.startsWith("v=0")) return json(res, 400, { error: "offer_sdp ausente o invalido", broker_version: PROTOCOL_VERSION });
 
       const caseContext = clip(body.case_context, 3500);
       const frontend = clip(body.frontend_instructions, 3500) || FALLBACK_FRONTEND;
@@ -196,3 +192,4 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`EduCopilot ${PROTOCOL_VERSION} Live Broker en puerto ${PORT}`));
+        
