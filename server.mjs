@@ -3,7 +3,7 @@ import http from "node:http";
 const PORT = process.env.PORT || 10000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const BROKER_TOKEN = process.env.EDUCOPILOT_BROKER_TOKEN || "";
-const PROTOCOL_VERSION = "53.0";
+const PROTOCOL_VERSION = "54.0";
 const MAX_BODY = 128 * 1024;
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_SESSIONS_PER_WINDOW = 12;
@@ -15,7 +15,7 @@ const SAFE_VOICES = new Set([
   "marin","meridian","quartz","ripple","sage","shimmer","stone","tempo","verse","vesper","willow"
 ]);
 
-const FALLBACK_FRONTEND = `Eres Edu, la inteligencia de taller de EduCopilot. Tu nombre es Edu y no tienes género: nunca uses masculino ni femenino para describirte. Habla en español de España con una presencia técnica sobria, directa, rápida y segura. Frases cortas. Sin sentimentalismo, sin muletillas y sin decir «un momento», «déjame», «estoy pensando», «sereno/serena», «me alegra» ni similares. No imites a ningún personaje ni voz concreta. Escucha mientras hablas y deja que el mecánico te interrumpa. Mantén continuidad estricta del caso y de la misión activa. Cuando haya pantalla OTOFIX, usa únicamente la evidencia de pantalla recibida; si el runtime indica VISION_OTOFIX: AVAILABLE no digas que no puedes verla. Si el snapshot está ausente u obsoleto, dilo con precisión. Nunca inventes valores, DTC, vehículo, pruebas ni ejecución. ACK no significa objetivo cumplido. Solo afirma que una acción de máquina terminó cuando el runtime indique OBJECTIVE_VERIFIED. Las órdenes físicas pasan siempre por las autorizaciones deterministas de EduCopilot.`;
+const FALLBACK_FRONTEND = `Eres la interfaz de voz de EduCopilot. El cerebro técnico canónico está en la aplicación. Delega al cliente cualquier consulta, diagnóstico, decisión o acción técnica y expresa únicamente el resultado que la aplicación devuelva. No construyas un diagnóstico paralelo. Tu nombre conversacional es Edu, Tu nombre es Edu y no tienes género: nunca uses masculino ni femenino para describirte. Habla en español de España con una presencia técnica sobria, directa, rápida y segura. Frases cortas. Sin sentimentalismo, sin muletillas y sin decir «un momento», «déjame», «estoy pensando», «sereno/serena», «me alegra» ni similares. No imites a ningún personaje ni voz concreta. Escucha mientras hablas y deja que el mecánico te interrumpa. No respondas con confirmaciones vacías como «sí, te escucho», «te sigo» o «voy» cuando el mecánico está continuando una frase; espera a que complete la idea y responde al contenido técnico completo. Mantén continuidad estricta del caso y de la misión activa. Cuando haya pantalla OTOFIX, usa únicamente la evidencia de pantalla recibida; si el runtime indica VISION_OTOFIX: AVAILABLE no digas que no puedes verla. Si el snapshot está ausente u obsoleto, dilo con precisión. Nunca inventes valores, DTC, vehículo, pruebas ni ejecución. ACK no significa objetivo cumplido. Solo afirma que una acción de máquina terminó cuando el runtime indique OBJECTIVE_VERIFIED. Las órdenes físicas pasan siempre por las autorizaciones deterministas de EduCopilot.`;
 
 function clip(value, max) {
   const s = typeof value === "string" ? value.trim() : "";
@@ -84,12 +84,16 @@ function json(res, code, value) {
   res.writeHead(code, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff"
+    "X-Content-Type-Options": "nosniff",
+    "X-EduCopilot-Broker-Version": PROTOCOL_VERSION
   });
   res.end(JSON.stringify(value));
 }
 
 const server = http.createServer(async (req, res) => {
+  const startedAt = Date.now();
+  console.log(`[REQ] ${req.method} ${req.url} ip=${clientIp(req)}`);
+  res.on("finish", () => console.log(`[RES] ${req.method} ${req.url} status=${res.statusCode} ms=${Date.now()-startedAt} protocol=${PROTOCOL_VERSION}`));
   if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
     return json(res, 200, {
       ok: true,
@@ -132,20 +136,26 @@ const server = http.createServer(async (req, res) => {
       const session = {
         model: "gpt-live-1",
         store: false,
-        audio: { output: { voice } },
+        audio: {
+          input: {
+            transcription: {
+              model: "gpt-4o-transcribe",
+              language: "es",
+              prompt: "Taller de automoción en España. Transcribe completos DTC y códigos como P0238, P0299, U0100; marcas, motores, unidades y términos técnicos."
+            },
+            turn_detection: {
+              type: "semantic_vad",
+              eagerness: "low",
+              create_response: true,
+              interrupt_response: true
+            }
+          },
+          output: { voice }
+        },
         instructions: frontend,
-        delegation: {
-          type: "responses",
-          responses: {
-            model: "gpt-5.6-terra",
-            instructions: backend(caseContext),
-            max_output_tokens: 700,
-            reasoning: { effort: "low" },
-            text: { verbosity: "low" },
-            parallel_tool_calls: false,
-            tool_choice: "none"
-          }
-        }
+        // 54.0 ONE BRAIN: GPT-Live is the speech interface, never a second diagnostic brain.
+        // Every technical turn is delegated back to the Android Edu brain.
+        delegation: { type: "client" }
       };
 
       const openai = await fetch("https://api.openai.com/v1/live/sessions", {
