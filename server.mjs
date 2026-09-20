@@ -136,22 +136,10 @@ const server = http.createServer(async (req, res) => {
       const session = {
         model: "gpt-live-1",
         store: false,
-        audio: {
-          input: {
-            transcription: {
-              model: "gpt-4o-transcribe",
-              language: "es",
-              prompt: "Taller de automoción en España. Transcribe completos DTC y códigos como P0238, P0299, U0100; marcas, motores, unidades y términos técnicos."
-            },
-            turn_detection: {
-              type: "semantic_vad",
-              eagerness: "low",
-              create_response: true,
-              interrupt_response: true
-            }
-          },
-          output: { voice }
-        },
+        // Live WebRTC negotiates input audio on the media transport.
+        // Current /v1/live/sessions MediaSessionConfig only accepts audio.output here;
+        // session.audio.input belongs to older/different realtime schemas and is rejected.
+        audio: { output: { voice } },
         instructions: frontend,
         // 54.0 ONE BRAIN: GPT-Live is the speech interface, never a second diagnostic brain.
         // Every technical turn is delegated back to the Android Edu brain.
@@ -202,4 +190,3 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`EduCopilot ${PROTOCOL_VERSION} Live Broker en puerto ${PORT}`));
-        
